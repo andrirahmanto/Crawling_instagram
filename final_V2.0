@@ -1,0 +1,339 @@
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import time
+import emoji
+import string
+import pandas as pd
+import csv
+
+
+
+def login_instagram(url,username,password):
+    #Masuk ke url
+    browser.get(url)
+    time.sleep(2)
+    
+    #Klik untuk login
+    loginLink = browser.find_element_by_xpath('/html/body/span/section/main/article/div[2]/div[2]/p/a')
+    loginLink.click()
+    time.sleep(2)
+    
+    #Isi form dan login
+    barUsername = browser.find_element_by_xpath('/html/body/span/section/main/div/article/div/div[1]/div/form/div[2]/div/label/input')
+    barPassword = browser.find_element_by_xpath('/html/body/span/section/main/div/article/div/div[1]/div/form/div[3]/div/label/input')
+    loginAcc = browser.find_element_by_xpath('/html/body/span/section/main/div/article/div/div[1]/div/form/div[4]/button')
+    barUsername.send_keys(username)
+    barPassword.send_keys(password)
+    loginAcc.click()
+    time.sleep(3)
+
+    try:
+        #Close pop-up
+        browser.find_element_by_xpath('/html/body/div[3]/div/div/div[3]/button[2]').click()
+        time.sleep(1)
+        target = username
+        return target
+
+    except:
+        target = username
+        return target
+
+
+
+
+def get_follower():
+        
+    #mendapatkan jumlah follower
+    realNumberOfFollower = browser.find_element_by_xpath('/html/body/span/section/main/div/header/section/ul/li[2]/a/span').get_attribute('title').replace(',','')
+    realNumberOfFollower = int(realNumberOfFollower.replace(',',''))
+    
+    #klik follower
+    followersLink = browser.find_element_by_css_selector('ul li a')
+    followersLink.click()
+    time.sleep(2)
+    
+    #mendapatkan panjang dari list yang di load
+    followersList = browser.find_element_by_xpath('/html/body/div[3]/div/div[2]/ul')
+    loadNumberOfFollower = len(followersList.find_elements_by_css_selector('li'))
+    time.sleep(2)
+
+    #klik bar kosong akun pertama
+    browser.find_element_by_xpath('/html/body/div[3]/div/div[2]/ul').click()
+
+    
+    #scroll follower
+    counter = 0
+    saveVariabel = 0
+    actionChain = webdriver.ActionChains(browser)
+    while (loadNumberOfFollower < realNumberOfFollower and loadNumberOfFollower <= 1000) : #mengatasi loading lama 
+        time.sleep(1)
+        #mengatasi loading lama
+        if saveVariabel == loadNumberOfFollower:
+            counter += 1
+            if counter > 4:
+                break
+        else:
+            browser.find_element_by_xpath('/html/body/div[3]/div/div[2]/ul/div/li[' + str(loadNumberOfFollower-2) + ']').click()
+            counter = 0
+        actionChain.key_down(Keys.SPACE).key_up(Keys.SPACE).perform() #scroll menggunakan space
+        saveVariabel = loadNumberOfFollower
+        loadNumberOfFollower = len(followersList.find_elements_by_css_selector('li'))
+        print(loadNumberOfFollower)
+    # batas scraping follower = 500
+    if loadNumberOfFollower > 1000:
+       loadNumberOfFollower = 1000
+
+
+    follower = []
+    for i in range(1, loadNumberOfFollower):
+        if int(realNumberOfFollower) > 12:
+            follower.append(browser.find_element_by_xpath('/html/body/div[3]/div/div[2]/ul/div/li['+str(i)+']/div/div[1]/div[2]/div[1]/a').get_attribute('title'))
+        else:
+            follower.append(browser.find_element_by_xpath('/html/body/div[3]/div/div[2]/ul/div/li['+str(i)+']/div/div[2]/div[1]/div/div/a').get_attribute('title'))
+    return follower, realNumberOfFollower
+
+def give_emoji_free_text(text): #Untuk membuang semua emoji
+        allchars = [str for str in text.encode('ascii', 'ignore').decode('utf-8')]
+        emoji_list = [c for c in allchars if c in emoji.UNICODE_EMOJI]
+        clean_text = ' '.join([str for str in text.encode('ascii', 'ignore').decode('utf-8').split() if not any(i in str for i in emoji_list)])
+        return clean_text
+
+def hashtag(text): #Untuk mendapatkan tag
+    char = text.encode('ascii', 'ignore').decode('utf-8').replace('\n',' ')
+    tag = []
+    teks = ''
+    tulis = 0
+    for i in range(len(char)):
+        if tulis == 1:
+            teks = teks + char[i]
+        if char[i] == '#':
+            tulis = 1
+        elif (char[i] == ' ' or i == len(char)-1) and teks != '':
+            teks = '#' + teks
+            tag.append(teks)
+            tulis = 0
+            teks = ''
+    return tag
+
+def privateCheck():
+    try:
+        browser.find_element_by_xpath('/html/body/span/section/main/div/div/article/div[1]/div/h2')
+        return True
+    except:
+        return False
+
+def getLikes():
+    try:
+        try:
+            #like photo
+            try:
+                likes = browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/section[2]/div/div/button/span').text #Untuk mengambil like yang punya banyak likes.
+            except:
+                likes = browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/section[2]/div/div/button').text #Untuk likes-nya sedikit
+                likes = likes.replace('like this','').replace('like','')#Untuk me-replace 'like this' atau 'like'
+        except:
+            #like video
+            browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/section[2]/div/span').click()
+            likes = browser.find_element_by_xpath(' /html/body/div[3]/div[2]/div/article/div[2]/section[2]/div/div/div[4]').text
+        likes = likes.replace('like this','0').replace('likes','').replace('like','')
+        likes = int(likes)
+    except:
+        print('Erorr likes')
+        likes = 0
+    print('likes = ', likes)
+    return likes
+
+def getCaptionTag():
+    try:
+        translator = str.maketrans('', '', string.punctuation)
+        teks = browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/div[1]/ul/div/li/div/div/div[2]/span').text #Mengambil captionnya dan menyimpannya dalam variabel teks
+        tag = hashtag(teks) #Meyimpan kumpulan tag
+        if len(tag) == 0:
+            tag = []
+        teks = give_emoji_free_text(teks) #Menyingkirkan emoji dari teks
+        teks = teks.translate(translator).lower() #Membuat huruf menjadi kecil
+    except:
+        print('Erorr caption and tag')
+        teks = ''
+        tag = []
+    print('teks = ',teks)
+    print('tag = ',tag)
+    return teks, tag
+
+def getComments(comment):
+    try:
+        translator = str.maketrans('', '', string.punctuation)
+        commentlist = len(browser.find_elements_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/div[1]/ul/ul'))
+        comment = []
+        for i in range(1,commentlist+1):
+            morecomment = []
+            commentter = browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/div[1]/ul/ul['+str(i)+']/div/li/div/div[1]/div[2]/h3/a').text
+            teksc = browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/article/div[2]/div[1]/ul/ul['+str(i)+']/div/li/div/div[1]/div[2]/span').text
+            teksc = give_emoji_free_text(teksc)
+            teksc = teksc.translate(translator).lower()
+            morecomment.append(commentter)
+            morecomment.append(teksc)
+            comment.append(morecomment)
+        if len(comment) == 0:
+            comment = []
+    except:
+        print('Erorr comment')
+        comment = []
+    print ('comment = ',comment)
+    return comment
+        
+def tabel2(namafile, username, caption):
+    try: #Untuk meng-set datanya, jika terjadi error maka file belum ada dan lanjut ke exception
+        print('masuk try')
+        dataset = pd.read_csv(namafile)
+        done = {}
+        simpan_merge = []
+        print(caption)
+        for i in range(len(caption)):
+            if len(caption[i]) == 1:
+                caption[i].append('')
+            post = caption[i]
+            print(post)
+            print("TIPE: " + str(type(caption)))
+            split = post.split() #Untuk membuat string bisa diakses lewat index --> contoh: 'saya mau makan' akan menjadi ['saya', 'mau', 'makan']. Dipisah berdasarkan ada space atau tidak
+            print(split)
+            for length in range(len(split)-1):
+                bantu = []
+                merge = split[length] + ' ' + split[length+1]
+                bantu.append(username)
+                bantu.append(split[length])
+                bantu.append(split[length+1])
+                if bantu not in simpan_merge:
+                    simpan_merge.append(bantu)
+                if merge in done.keys():
+                    done[merge] += 1
+                else:
+                    done[merge] = 1
+        with open(namafile,'a',newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for n in range(len(simpan_merge)):
+                writer.writerow([simpan_merge[n][0],simpan_merge[n][1],simpan_merge[n][2], done[simpan_merge[n][1] + ' ' + simpan_merge[n][2]]])
+            
+    except: #Karena file belum ada lalu dibuat filenya
+        print('masuk except')
+        with open(namafile, 'a', newline='') as csvfile: #Membuat file '.csv'
+            writer = csv.writer(csvfile)
+            writer.writerow(['id_user','word1','word2','totals'])
+    
+def getPost(target, countAccount):
+    caption = ''
+    tag = []
+    likes = 0
+    comments = []
+    numberOfPost = browser.find_element_by_xpath('/html/body/span/section/main/div/header/section/ul/li[1]/span/span').text
+    numberOfPost = int(numberOfPost.replace(',',''))
+
+    if numberOfPost == 0:
+        return caption, tag, likes, comments
+
+    tes = 0
+    counters = 0
+    succees = False
+    while succees == False:
+        try:
+            browser.find_element_by_xpath('/html/body/span/section/main/div/div['+str(tes)+']/article/div[1]/div/div[1]/div[1]').click()
+            succees = True
+        except:
+            tes += 1
+            counters += 1
+            if counters == 10:
+                break
+            continue
+
+    if succees == False:
+        return caption, tag, likes, comments
+
+
+    countPost = 1
+    time.sleep(2)
+    caption4level2 = []
+    while countPost <= numberOfPost:
+        print ('\n\nAccount ke ',countAccount)
+        print('post ke ',countPost)
+        time.sleep(3)
+        try:
+            browser.find_element_by_xpath('/html/body/div[3]/div[2]/div/div/div/svg')
+            if countPost != numberOfPost:
+                if countPost ==1:
+                    browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a')
+                else:
+                    browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a[2]').click()#klik kanan
+                time.sleep(2)
+                browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a[1]') .click()#klik kiri
+            else:
+                browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a[1]') .click()#klik kiri
+                time.sleep(2)
+                browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a[2]').click()#klik kanan
+        except:
+            likes = getLikes()
+            caption, tag = getCaptionTag()
+            comments = getComments(comments)
+            if len(caption) != 0:
+                caption4level2.append(caption)
+            print('Ini caption: ' + caption)
+            print("Ini biang masalah: " + str(caption4level2))
+            #masukkan ke csv
+            with open('level1.csv', 'a', newline = '') as csvfile: #Menambahkan file '.csv' dengan data baru
+                        writer = csv.writer(csvfile)
+                        writer.writerow([target, caption, tag, likes, comments])
+            
+            if countPost == numberOfPost:
+                print(caption4level2)
+                tabel2('level2.csv',target,caption4level2)
+                return caption, tag, likes, comments
+            if countPost ==1:
+                browser.find_element_by_xpath('/html/body/div[3]').click()#klik bar misterius
+                browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a').click()#klik kanan post pertama
+            else:
+                browser.find_element_by_xpath('/html/body/div[3]').click()#klik bar misterius
+                browser.find_element_by_xpath('/html/body/div[3]/div[1]/div/div/a[2]').click()#klik kanan
+            countPost += 1
+        if countPost >= numberOfPost:
+            browser.get('https://www.instagram.com/'+target)
+            time.sleep(2)
+    
+
+
+    
+def crawlAccount(target,countAccount):
+    browser.get(url+'/'+target)
+    private = privateCheck()
+    if not private:
+        getPost(target,countAccount)
+        listOfFollower, numberOfFolower = get_follower()
+        return listOfFollower
+    else :
+        listOfFollower = []
+        return listOfFollower    
+        
+def play():
+    with open('level1.csv','a',newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['username','post','tag','likes','comment'])
+    ring = 2
+    countAccount = 1
+    target = login_instagram(url,username,password)
+    listOfFollower = crawlAccount(target,countAccount)
+    for i in listOfFollower:
+        try:
+            crawlAccount(i,countAccount)
+            countAccount += 1
+        except:
+            print('Erorr Account')
+            countAccount += 1
+            continue
+    print(listOfFollower)
+    #followerList, followerNumber = get_follower(target)
+
+    
+browser = webdriver.Chrome()
+url = "https://www.instagram.com"
+username = 'wordmotivated'
+password = '12345676'
+play()
+#browser.quit()
