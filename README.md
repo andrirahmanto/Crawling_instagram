@@ -1,6 +1,11 @@
 ## Crawling_instagram
 Andri Rahmnato &amp; Khulaifi Alkatsiri
 
+## update
+instagram crawler telah di update menjadi version 2.0
+- bisa membuat tabel 2 ('pairing word')
+- tidak terkena instagram rate limit
+- support untuk scraping hingga ring 2 follower
 
 # instagram posts crawler
 Merupakan program yang berguna untuk mendapatkan dan mengolah konten post di Instagram menjadi Dataset.
